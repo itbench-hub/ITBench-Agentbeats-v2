@@ -18,11 +18,23 @@ from executor import Executor
 def main():
     load_dotenv()
     
+    print("\n" + "="*80)
+    print("🚀 SRE DIAGNOSIS AGENT SERVER")
+    print("="*80)
+    
     parser = argparse.ArgumentParser(description="Run the SRE Diagnosis Agent.")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind the server")
     parser.add_argument("--port", type=int, default=9019, help="Port to bind the server")
     parser.add_argument("--card-url", type=str, help="URL to advertise in the agent card")
     args = parser.parse_args()
+
+    print(f"\n📋 Configuration:")
+    print(f"   Host: {args.host}")
+    print(f"   Port: {args.port}")
+    print(f"   Model: {os.getenv('MODEL', 'Not set')}")
+    print(f"   Provider: {os.getenv('PROVIDER', 'Not set')}")
+    print(f"   Base URL: {os.getenv('URL', 'Not set')}")
+    print()
 
     skill = AgentSkill(
         id="sre_diagnosis",
@@ -52,6 +64,10 @@ def main():
         agent_card=agent_card,
         http_handler=request_handler,
     )
+
+    print(f"✅ Server starting at http://{args.host}:{args.port}")
+    print(f"   Ready to diagnose Kubernetes incidents!")
+    print("="*80 + "\n")
 
     uvicorn.run(
         app.build(),

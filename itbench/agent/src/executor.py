@@ -42,24 +42,33 @@ class Executor(AgentExecutor):
             )
 
         if not task:
+            print(f"\n🆕 Creating new task...")
             task = new_task(msg)
             await event_queue.enqueue_event(task)
+            print(f"   Task ID: {task.id}")
+            print(f"   Context ID: {task.context_id}")
 
         context_id = task.context_id
         updater = TaskUpdater(event_queue, task.id, context_id)
+        
+        print(f"\n▶️  Starting task execution...")
         await updater.start_work()
 
         try:
             agent = self.agents.get(context_id)
             if not agent:
+                print(f"   Creating new agent instance for context {context_id}")
                 agent = Agent()
                 self.agents[context_id] = agent
+            else:
+                print(f"   Reusing existing agent for context {context_id}")
 
             await agent.run(msg, updater)
             if not updater._terminal_state_reached:
+                print(f"✅ Task completed successfully")
                 await updater.complete()
         except Exception as e:
-            print(f"Task failed with agent error: {e}")
+            print(f"❌ Task failed with agent error: {e}")
             await updater.failed(
                 new_agent_text_message(f"Agent error: {e}", context_id=context_id, task_id=task.id)
             )

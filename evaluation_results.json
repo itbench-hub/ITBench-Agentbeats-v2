@@ -1,0 +1,444 @@
+{
+  "raw_results": [
+    {
+      "scenario_index": 0,
+      "scores": {
+        "root_cause_entity": {
+          "gt_entities": [
+            "checkout-pod-1"
+          ],
+          "predicted_entities": [
+            {
+              "entity": "otel-demo/Service/frontend",
+              "matches_gt": false
+            },
+            {
+              "entity": "otel-demo/Service/ad",
+              "matches_gt": false
+            },
+            {
+              "entity": "kube-system/Pod/kube-scheduler",
+              "matches_gt": false
+            },
+            {
+              "entity": "kube-system/Pod/kube-controller-manager",
+              "matches_gt": false
+            }
+          ],
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0,
+          "justification": "The Ground Truth identifies the root cause as the 'checkout-pod-1' (or its alias 'checkout-service-1'). The model predicted 'frontend', 'ad', 'kube-scheduler', and 'kube-controller-manager' as contributing factors. None of these match the checkout service or pod. Therefore, precision, recall, and F1 are all 0."
+        },
+        "root_cause_reasoning": {
+          "calculation": 0,
+          "justification": "Since no root cause entities were correctly identified, the reasoning score is 0.",
+          "details": {}
+        },
+        "propagation_chain": {
+          "justification": "The F1-score is based on semantic components. The GT path is 'Checkout Service Component'. The model path starts with 'Kube Scheduler Component' and 'Frontend Service Component'. There is no overlap in the contracted paths.",
+          "details": {
+            "normalization_map": {
+              "otel-demo/Service/frontend": "frontend-service",
+              "otel-demo/Service/frontend-proxy": "frontend-proxy-service",
+              "otel-demo/Service/checkout": "checkout-service-1",
+              "otel-demo/Service/payment": "payment-service",
+              "otel-demo/Service/shipping": "shipping-service",
+              "otel-demo/Service/email": "email-service",
+              "kube-system/Pod/kube-scheduler": "kube-scheduler-pod",
+              "otel-demo/Pod/frontend-pending": "frontend-pod"
+            },
+            "semantic_components": {
+              "Checkout Service Component": [
+                "checkout-pod-1",
+                "checkout-service-1"
+              ],
+              "Kube Scheduler Component": [
+                "kube-scheduler-pod"
+              ],
+              "Frontend Service Component": [
+                "frontend-service",
+                "frontend-pod"
+              ],
+              "Frontend Proxy Component": [
+                "frontend-proxy-service"
+              ],
+              "Payment Service Component": [
+                "payment-service"
+              ],
+              "Shipping Service Component": [
+                "shipping-service"
+              ],
+              "Email Service Component": [
+                "email-service"
+              ]
+            },
+            "contracted_gt_path": [
+              "Checkout Service Component"
+            ],
+            "contracted_model_path": [
+              "Kube Scheduler Component",
+              "Frontend Service Component",
+              "Frontend Proxy Component",
+              "Checkout Service Component",
+              "Payment Service Component",
+              "Shipping Service Component",
+              "Email Service Component"
+            ],
+            "lcs_components": [
+              "Checkout Service Component"
+            ],
+            "true_positives_TP": 1,
+            "model_path_length": 7,
+            "gt_path_length": 1
+          },
+          "precision": 0.14285714285714285,
+          "recall": 1.0,
+          "calculation": 0.25
+        },
+        "fault_localization_component_identification": {
+          "calculation": 1,
+          "justification": "The first performance failure in GT.propagations is: 'checkout pod is in ImagePullBackOff error'. Using Priority 1 rule (Explicit Component in Effect), the first impacted component is 'checkout pod' (Checkout Service Component). This component was found in the model's contracted path.",
+          "details": {
+            "gt_first_impacted_component": "Checkout Service Component",
+            "effect_used": "checkout pod is in ImagePullBackOff error",
+            "priority_rule_applied": "Priority 1",
+            "found_in_model_path": true
+          }
+        },
+        "root_cause_reasoning_partial": {
+          "calculation": 0.125,
+          "justification": "None of the model's root causes matched the GT. We calculate partial credit. \n1. 'frontend' (Frontend Service Component): This is on the model path. The hop distance on the contracted model path from 'Checkout Service Component' (GT Root) to 'Frontend Service Component' is not directly calculable from the GT path alone as GT is length 1. However, looking at the model's own logic, it places Frontend upstream of Checkout. In the contracted model path, 'Frontend' is 2 hops away from 'Checkout' (Kube -> Frontend -> Proxy -> Checkout). Wait, the metric defines 'hop_away' on the *contracted semantic path (from Phase 2)*. The GT path is just ['Checkout Service Component']. The model entities 'frontend', 'ad', 'kube-scheduler' are NOT on the GT path. Therefore, they get 0 partial credit? \n\nCorrection on Logic: The metric says 'Verify Symptom on Path: Ensure the semantic component of the model's focus entity is on the contracted GT path'. \nThe contracted GT path is `['Checkout Service Component']`. \nThe model's root causes are 'frontend', 'ad', 'kube-scheduler', 'kube-controller-manager'. \nNone of these components are in `['Checkout Service Component']`. \nTherefore, `hop_away` cannot be calculated because the entities are not on the GT path. \n\nHowever, let's look closer. The model *does* mention 'checkout' as a downstream victim. But the 'focus entity' for partial credit is the *predicted root cause*. \nPredicted RC 1: Frontend. Component: Frontend Service. Is it on GT Path? No. Score: 0.\nPredicted RC 2: Ad. Component: Ad Service. Is it on GT Path? No. Score: 0.\nPredicted RC 3: Kube Scheduler. Component: Kube Scheduler. Is it on GT Path? No. Score: 0.\n\nWait, is there any ambiguity? The GT path is extremely short: `checkout-pod -> checkout-service`. This collapses to a single component. If the model predicts something outside this component, it is off-path. \n\nLet's re-read the metric: 'Ensure the semantic component of the model's focus entity is on the contracted GT path'. \nSince the GT path only contains 'Checkout Service Component', and none of the model's root causes map to this component, the score is 0.",
+          "details": [
+            {
+              "entity": "otel-demo/Service/frontend",
+              "metric1_is_correct": false,
+              "hop_away": null,
+              "SymptomReasoningCorrectness": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "otel-demo/Service/ad",
+              "metric1_is_correct": false,
+              "hop_away": null,
+              "SymptomReasoningCorrectness": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-scheduler",
+              "metric1_is_correct": false,
+              "hop_away": null,
+              "SymptomReasoningCorrectness": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-controller-manager",
+              "metric1_is_correct": false,
+              "hop_away": null,
+              "SymptomReasoningCorrectness": null,
+              "entity_score": 0
+            }
+          ]
+        },
+        "root_cause_proximity_no_fp": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.25,
+          "calculation_f1": 0.0,
+          "justification": "Precision: The model predicted 4 root causes (Frontend, Ad, Scheduler, Controller Manager). None of these components appear on the contracted GT path (which is just 'Checkout Service Component'). Thus, they are not 'on path' relative to the GT, or if we consider the graph, they are disconnected from the GT root in the GT's view. Actually, the metric says 'If PF_j is not on the contracted path, score_j = 0'. The contracted GT path is ['Checkout Service Component']. None of the model RCs are in this list. So Precision is 0.\n\nRecall: The GT root cause is 'Checkout Service Component'. We check if this exists in the model's path. Yes, 'Checkout Service Component' is in the `contracted_model_path`. We calculate the distance from the GT Root (Checkout) to the nearest Model Root (Frontend, Ad, Scheduler) *within the model's graph*? \nNo, the metric says: 'Compute hop_away_i,j to every model component PF_j'. \nGT Root: Checkout Service Component.\nModel Roots: \n1. Frontend Service Component. Distance in Model Path: Kube -> Frontend -> Proxy -> Checkout. Distance = 2 hops (Frontend to Checkout). Score = 1/(1+2) = 0.33.\n2. Ad Service Component. Not in contracted model path. Score = 0.\n3. Kube Scheduler Component. Distance in Model Path: Kube -> Frontend -> Proxy -> Checkout. Distance = 3 hops. Score = 1/(1+3) = 0.25.\n4. Kube Controller Manager. Not in path. Score = 0.\n\nMax score for GT Root is 0.33 (from Frontend). \nWait, looking at the model path: `['Kube Scheduler Component', 'Frontend Service Component', 'Frontend Proxy Component', 'Checkout Service Component', ...]`\nDistance from Scheduler (Index 0) to Checkout (Index 3) is 3 hops.\nDistance from Frontend (Index 1) to Checkout (Index 3) is 2 hops.\nSo the closest model root to the GT root (Checkout) is Frontend (2 hops). \nScore_i = 1 / (1 + 2) = 0.333.\n\nLet's re-evaluate Precision. 'If PF_j is not on the contracted path, score_j = 0'. This refers to the *contracted GT path*. Since the GT path is only `['Checkout Service Component']`, and none of the model RCs are 'Checkout', they are all 0.\n\nLet's re-evaluate Recall. 'If GT_i has no representation on the path'. This refers to the *contracted model path*. GT_i is 'Checkout'. It IS on the model path. \nWe compute distance from GT_i (Checkout) to Model Roots (Scheduler, Frontend). \nDistance to Scheduler: 3 hops. \nDistance to Frontend: 2 hops. \nMin distance is 2. \nScore = 1 / (1 + 2) = 0.333.\n\nCorrection: The rubric says 'Compute hop_away_i,j to every model component PF_j'. It implies measuring distance on a graph. Which graph? Usually the Model's graph for Recall (finding GT in Model) and GT's graph for Precision (finding Model in GT). \nHowever, the prompt for Precision says: 'If PF_j is not on the contracted path [GT Path], score_j = 0'. Since GT path is length 1, and Model RCs are not it, Precision is 0.\nFor Recall: 'If GT_i has no representation on the path [Model Path], score_i = 0'. GT Root (Checkout) IS on Model Path. \nDistance from Checkout (Index 3) to Scheduler (Index 0) = 3.\nDistance from Checkout (Index 3) to Frontend (Index 1) = 2.\nMax Score is based on min distance (2). Score = 1/3 = 0.333.",
+          "precision_details": [
+            {
+              "entity": "otel-demo/Service/frontend",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "otel-demo/Service/ad",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-scheduler",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-controller-manager",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            }
+          ],
+          "recall_details": [
+            {
+              "gt_entity": "checkout-pod-1",
+              "is_on_path": true,
+              "hop_away": 2,
+              "entity_score": 0.3333333333333333
+            }
+          ]
+        },
+        "root_cause_proximity_with_fp": {
+          "gt_path_length": 1,
+          "calculation_precision": 0,
+          "calculation_recall": 0.3333333333333333,
+          "calculation_f1": 0,
+          "justification": "Precision is 0 because no model root causes are on the GT path. Recall is calculated based on the distance of 2 hops on the model path, normalized by the GT path length of 1.",
+          "precision_details": [
+            {
+              "entity": "otel-demo/Service/frontend",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "otel-demo/Service/ad",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-scheduler",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            },
+            {
+              "entity": "kube-system/Pod/kube-controller-manager",
+              "is_on_path": false,
+              "hop_away": null,
+              "entity_score": 0
+            }
+          ],
+          "recall_details": [
+            {
+              "gt_entity": "checkout-pod-1",
+              "is_on_path": true,
+              "hop_away": 2,
+              "entity_score": 0.3333333333333333
+            }
+          ]
+        },
+        "root_cause_entity_k": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        },
+        "root_cause_entity_k@1": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        },
+        "root_cause_entity_k@2": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        },
+        "root_cause_entity_k@3": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        },
+        "root_cause_entity_k@4": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        },
+        "root_cause_entity_k@5": {
+          "calculation_precision": 0.0,
+          "calculation_recall": 0.0,
+          "calculation_f1": 0.0
+        }
+      },
+      "incident_id": "23",
+      "trial_id": "1"
+    }
+  ],
+  "statistics": {
+    "per_incident": {
+      "23": {
+        "root_cause_entity_precision": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_entity_recall": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_entity_f1": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_entity_k_precision": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_entity_k_recall": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_entity_k_f1": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_reasoning": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "propagation_chain": {
+          "mean": 0.25,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "fault_localization_component_identification": {
+          "mean": 1.0,
+          "stderr": 0.0,
+          "n": 1,
+          "pass@1": 1.0
+        },
+        "root_cause_reasoning_partial": {
+          "mean": 0.125,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_no_fp_precision": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_no_fp_recall": {
+          "mean": 0.25,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_no_fp_f1": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_with_fp_precision": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_with_fp_recall": {
+          "mean": 0.3333333333333333,
+          "stderr": 0.0,
+          "n": 1
+        },
+        "root_cause_proximity_with_fp_f1": {
+          "mean": 0.0,
+          "stderr": 0.0,
+          "n": 1
+        }
+      }
+    },
+    "overall": {
+      "root_cause_entity_precision": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_entity_recall": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_entity_f1": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_entity_k_precision": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_entity_k_recall": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_entity_k_f1": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_reasoning": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "propagation_chain": {
+        "mean": 0.25,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "fault_localization_component_identification": {
+        "mean": 1.0,
+        "stderr": null,
+        "n_incidents": 1,
+        "pass@1": 1.0
+      },
+      "root_cause_reasoning_partial": {
+        "mean": 0.125,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_no_fp_precision": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_no_fp_recall": {
+        "mean": 0.25,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_no_fp_f1": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_with_fp_precision": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_with_fp_recall": {
+        "mean": 0.3333333333333333,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "root_cause_proximity_with_fp_f1": {
+        "mean": 0.0,
+        "stderr": null,
+        "n_incidents": 1
+      },
+      "total_bad_runs": 0
+    }
+  },
+  "config": {
+    "ground_truth_path": "/Users/noahz/Documents/ITBench-Agentbeats-v2/Scenarios",
+    "outputs_path": "outputs",
+    "eval_criteria": [
+      "ROOT_CAUSE_ENTITY",
+      "ROOT_CAUSE_REASONING",
+      "PROPAGATION_CHAIN",
+      "FAULT_LOCALIZATION",
+      "ROOT_CAUSE_REASONING_PARTIAL",
+      "ROOT_CAUSE_PROXIMITY",
+      "ROOT_CAUSE_PROXIMITY_FP"
+    ],
+    "k": 3
+  }
+}

@@ -74,6 +74,72 @@ class Agent:
         logger.warning(f"Scenario data directory not found at {data_dir}")
         self.scenarios = []
 
+    def _chunk_data(self, data: dict, chunk_size: int = 50000) -> list[dict]:
+        """Split large data into smaller chunks to avoid payload size limits.
+        
+        Args:
+            data: Dictionary of data to chunk (e.g., {"file1.json": content1, "file2.tsv": content2})
+            chunk_size: Target size in characters for each chunk
+            
+        Returns:
+            List of chunk dictionaries, each containing a subset of the original data
+        """
+        chunks = []
+        current_chunk = {}
+        current_size = 0
+        
+        for key, value in data.items():
+            value_str = json.dumps(value) if not isinstance(value, str) else value
+            value_size = len(value_str)
+            
+            # If a single value is larger than chunk_size, split it
+            if value_size > chunk_size:
+                # First, add current chunk if it has data
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = {}
+                    current_size = 0
+                
+                # Split the large value into parts
+                if isinstance(value, str):
+                    # For strings (like TSV files), split by lines
+                    lines = value.split('\n')
+                    part_lines = []
+                    part_size = 0
+                    
+                    for line in lines:
+                        line_size = len(line) + 1  # +1 for newline
+                        if part_size + line_size > chunk_size and part_lines:
+                            # Save current part
+                            chunks.append({f"{key}_part_{len(chunks)}": '\n'.join(part_lines)})
+                            part_lines = []
+                            part_size = 0
+                        part_lines.append(line)
+                        part_size += line_size
+                    
+                    # Add remaining lines
+                    if part_lines:
+                        chunks.append({f"{key}_part_{len(chunks)}": '\n'.join(part_lines)})
+                else:
+                    # For other types, just include as-is with a warning
+                    chunks.append({key: value})
+                    logger.warning(f"Large non-string value for {key}: {value_size} chars")
+            else:
+                # Check if adding this value would exceed chunk size
+                if current_size + value_size > chunk_size and current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = {}
+                    current_size = 0
+                
+                current_chunk[key] = value
+                current_size += value_size
+        
+        # Add final chunk if it has data
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks if chunks else [{}]
+
     def _load_specific_data(self, scenario_name: str, data_type: str) -> dict:
         """Load a specific type of data for a scenario."""
         if not self.data_dir:
@@ -99,7 +165,7 @@ class Agent:
                 if file_path.is_file() and not file_path.name.startswith("."):
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
-                            content = f.read(100000)
+                            content = f.read()
                             if file_path.suffix == ".json":
                                 try:
                                     data[file_path.name] = json.loads(content)
@@ -113,11 +179,72 @@ class Agent:
             # Load single file
             try:
                 with open(target_path, "r", encoding="utf-8") as f:
-                    data[target_path.name] = f.read(100000)
+                    data[target_path.name] = f.read()
             except Exception as e:
                 return {"error": f"Could not read {data_type}: {e}"}
         
         return data
+
+    async def _send_data_response(
+        self, 
+        updater: TaskUpdater, 
+        scenario: str, 
+        data_type: str, 
+        data: dict
+    ) -> None:
+        """Send data response, chunking if necessary to avoid payload size limits.
+        
+        Args:
+            updater: Task updater for sending responses
+            scenario: Scenario name
+            data_type: Type of data being sent
+            data: Dictionary of data to send
+        """
+        # Estimate payload size
+        data_str = json.dumps(data)
+        data_size = len(data_str)
+        
+        # If data is small enough, send as single response
+        MAX_PAYLOAD_SIZE = 40000  # Conservative limit to avoid JSON-RPC errors
+        if data_size <= MAX_PAYLOAD_SIZE:
+            logger.info(f"Sending {data_type} data ({data_size} chars) in single response")
+            await updater.add_artifact(
+                parts=[Part(root=DataPart(data={
+                    "type": "data_response",
+                    "scenario": scenario,
+                    "data_type": data_type,
+                    "content": data
+                }))],
+                name="Response",
+            )
+            return
+        
+        # Data is too large, chunk it
+        logger.info(f"Data too large ({data_size} chars), chunking...")
+        chunks = self._chunk_data(data, chunk_size=MAX_PAYLOAD_SIZE)
+        total_chunks = len(chunks)
+        
+        logger.info(f"Sending {data_type} in {total_chunks} chunks")
+        
+        # Send each chunk
+        for i, chunk in enumerate(chunks):
+            chunk_num = i + 1
+            logger.info(f"Sending chunk {chunk_num}/{total_chunks} ({len(json.dumps(chunk))} chars)")
+            
+            await updater.add_artifact(
+                parts=[Part(root=DataPart(data={
+                    "type": "data_response",
+                    "scenario": scenario,
+                    "data_type": data_type,
+                    "content": chunk,
+                    "chunk_info": {
+                        "chunk_number": chunk_num,
+                        "total_chunks": total_chunks,
+                        "is_chunked": True
+                    }
+                }))],
+                name=f"Response (chunk {chunk_num}/{total_chunks})",
+            )
 
     def validate_request(self, request: EvalRequest) -> tuple[bool, str]:
         """Validate an evaluation request."""
@@ -185,14 +312,11 @@ class Agent:
                         name="Response",
                     )
                 else:
-                    await updater.add_artifact(
-                        parts=[Part(root=DataPart(data={
-                            "type": "data_response",
-                            "scenario": self.current_scenario_name,
-                            "data_type": data_type,
-                            "content": data
-                        }))],
-                        name="Response",
+                    await self._send_data_response(
+                        updater=updater,
+                        scenario=self.current_scenario_name,
+                        data_type=data_type,
+                        data=data
                     )
                 return
             
@@ -223,14 +347,11 @@ class Agent:
                     name="Response",
                 )
             else:
-                await updater.add_artifact(
-                    parts=[Part(root=DataPart(data={
-                        "type": "data_response",
-                        "scenario": scenario,
-                        "data_type": data_type,
-                        "content": data
-                    }))],
-                    name="Response",
+                await self._send_data_response(
+                    updater=updater,
+                    scenario=scenario,
+                    data_type=data_type,
+                    data=data
                 )
             return
 
@@ -348,6 +469,79 @@ class Agent:
                 "message": f"Evaluation failed: {str(e)}",
             }
 
+    async def _send_chunked_data_via_messenger(
+        self,
+        scenario: str,
+        data_type: str,
+        data: dict,
+        agent_url: str
+    ) -> str:
+        """Send data via messenger, chunking if necessary.
+        
+        Returns the final response from the agent after all chunks are sent.
+        """
+        # Estimate payload size
+        data_str = json.dumps(data)
+        data_size = len(data_str)
+        
+        MAX_PAYLOAD_SIZE = 40000
+        
+        # If data is small enough, send as single response
+        if data_size <= MAX_PAYLOAD_SIZE:
+            logger.info(f"Sending {data_type} data ({data_size} chars) in single message")
+            data_response = {
+                "type": "data_response",
+                "scenario": scenario,
+                "data_type": data_type,
+                "content": data
+            }
+            return await self.messenger.talk_to_agent(
+                message=json.dumps(data_response),
+                url=agent_url,
+            )
+        
+        # Data is too large, chunk it
+        logger.info(f"Data too large ({data_size} chars), chunking for messenger...")
+        chunks = self._chunk_data(data, chunk_size=MAX_PAYLOAD_SIZE)
+        total_chunks = len(chunks)
+        
+        logger.info(f"Sending {data_type} in {total_chunks} chunks via messenger")
+        
+        # Send each chunk
+        response = ""
+        for i, chunk in enumerate(chunks):
+            chunk_num = i + 1
+            logger.info(f"Sending chunk {chunk_num}/{total_chunks} ({len(json.dumps(chunk))} chars)")
+            
+            data_response = {
+                "type": "data_response",
+                "scenario": scenario,
+                "data_type": data_type,
+                "content": chunk,
+                "chunk_info": {
+                    "chunk_number": chunk_num,
+                    "total_chunks": total_chunks,
+                    "is_chunked": True
+                }
+            }
+            
+            response = await self.messenger.talk_to_agent(
+                message=json.dumps(data_response),
+                url=agent_url,
+            )
+            
+            # If this is not the last chunk, we expect a chunk_ack
+            if chunk_num < total_chunks:
+                try:
+                    resp_json = json.loads(response)
+                    if resp_json.get("type") != "chunk_ack":
+                        logger.warning(f"Expected chunk_ack, got: {resp_json.get('type')}")
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not parse chunk ack response")
+        
+        # Return the final response (after last chunk)
+        return response
+
     async def _run_full_evaluation(self, request: EvalRequest, updater: TaskUpdater) -> None:
         """Run a full evaluation session with an agent."""
         import time
@@ -401,17 +595,25 @@ class Agent:
                             data_type = resp_json.get("data_type")
                             data = self._load_specific_data(scenario, data_type)
                             
-                            data_response = {
-                                "type": "data_response",
-                                "scenario": scenario,
-                                "data_type": data_type,
-                                "content": data if "error" not in data else {}
-                            }
-                            
-                            response = await self.messenger.talk_to_agent(
-                                message=json.dumps(data_response),
-                                url=agent_url,
-                            )
+                            if "error" not in data:
+                                response = await self._send_chunked_data_via_messenger(
+                                    scenario=scenario,
+                                    data_type=data_type,
+                                    data=data,
+                                    agent_url=agent_url
+                                )
+                            else:
+                                # Send error response
+                                data_response = {
+                                    "type": "data_response",
+                                    "scenario": scenario,
+                                    "data_type": data_type,
+                                    "content": {}
+                                }
+                                response = await self.messenger.talk_to_agent(
+                                    message=json.dumps(data_response),
+                                    url=agent_url,
+                                )
                         elif "entities" in resp_json or "propagations" in resp_json:
                             # Got diagnosis - save it for batch evaluation
                             results["scenarios"][scenario] = resp_json
