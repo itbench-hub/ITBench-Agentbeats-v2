@@ -1,35 +1,35 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
-name = "agentbeats-tutorial"
+name = "ITBench"
 version = "0.1.0"
-description = "Agentbeats Tutorial"
+description = "ITBench"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
-    "a2a-sdk[http-server]>=0.3.20",
+    "a2a-sdk>=0.3.0",
+    "asteval>=1.0.0",
+    "click>=8.1.8",
+    "dotenv>=0.9.9",
     "httpx>=0.28.1",
-    "pydantic>=2.11.9",
-    "python-dotenv>=1.1.1",
-    "uvicorn>=0.38.0",
-]
-
-[project.optional-dependencies]
-debate = [
-    "google-genai>=1.36.0",
-]
-tau2-agent = [
+    "json-repair>=0.30.0",
+    "langchain-google-genai>=2.1.4",
+    "langgraph>=0.4.1",
     "litellm>=1.0.0",
-]
-tau2-evaluator = [
-    "nest-asyncio>=1.6.0",
-    "tau2 @ git+https://github.com/sierra-research/tau2-bench.git",
+    "numpy>=2.2.6",
+    "pydantic>=2.11.4",
+    "python-dotenv>=1.1.0",
+    "pyyaml>=6.0",
+    "scipy>=1.15.3",
+    "sse-starlette>=2.3.5",
+    "starlette>=0.46.2",
+    "uvicorn>=0.34.2",
 ]
 
 [project.scripts]
 agentbeats-run = "agentbeats.run_scenario:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.uv]
 package = true

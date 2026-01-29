@@ -4,6 +4,6 @@
 .venv/
 __pycache__/
 *.pyc
-
-# tau2-bench data (downloaded via setup.sh)
-scenarios/tau2/tau2-bench/
+Scenarios.zip
+outputs
+Scenarios
