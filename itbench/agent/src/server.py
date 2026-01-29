@@ -22,10 +22,7 @@ def main():
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind the server")
     parser.add_argument("--port", type=int, default=9019, help="Port to bind the server")
     parser.add_argument("--card-url", type=str, help="URL to advertise in the agent card")
-    parser.add_argument("--agent-llm", type=str, default="openai/gpt-4.1", help="LLM model to use")
     args = parser.parse_args()
-
-    os.environ.setdefault("TAU2_AGENT_LLM", args.agent_llm)
 
     skill = AgentSkill(
         id="sre_diagnosis",

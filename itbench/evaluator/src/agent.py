@@ -22,7 +22,7 @@ from messenger import Messenger
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("tau2_evaluator")
+logger = logging.getLogger("evaluator")
 
 
 class EvalRequest(BaseModel):
@@ -59,27 +59,19 @@ class Agent:
 
     def _load_scenarios(self):
         """Load available scenarios from the data directory."""
-        # Try multiple possible data directory locations
-        possible_dirs = [
-            Path(os.environ.get("ITBENCH_DATA_DIR", "")),
-            Path("ITBench-Lite/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7"),
-            Path(__file__).resolve().parents[3] / "ITBench-Lite/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7",
-            Path("Scenarios"),
-            Path(__file__).resolve().parents[3] / "Scenarios",
-        ]
+        data_dir = Path(__file__).resolve().parents[3] / "Scenarios"
         
-        for data_dir in possible_dirs:
-            if data_dir.exists() and data_dir.is_dir():
-                self.data_dir = data_dir
-                self.scenarios = sorted([
-                    d.name for d in data_dir.iterdir() 
-                    if d.is_dir() and d.name.startswith("Scenario")
-                ])
-                if self.scenarios:
-                    logger.info(f"Loaded {len(self.scenarios)} scenarios from {data_dir}")
-                    return
+        if data_dir.exists() and data_dir.is_dir():
+            self.data_dir = data_dir
+            self.scenarios = sorted([
+                d.name for d in data_dir.iterdir() 
+                if d.is_dir() and d.name.startswith("Scenario")
+            ])
+            if self.scenarios:
+                logger.info(f"Loaded {len(self.scenarios)} scenarios from {data_dir}")
+                return
         
-        logger.warning("No scenario data directory found!")
+        logger.warning(f"Scenario data directory not found at {data_dir}")
         self.scenarios = []
 
     def _load_specific_data(self, scenario_name: str, data_type: str) -> dict:

@@ -16,11 +16,7 @@ from a2a.types import (
 
 def _default_itbench_data_dir() -> Path:
     """Find the ITBench scenarios data directory."""
-    tau2_dir = Path(__file__).resolve().parents[2]
     possible_dirs = [
-        tau2_dir.parent / "ITBench-Lite" / "snapshots" / "sre" / "v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7",
-        tau2_dir.parent / "Scenarios",
-        Path("ITBench-Lite/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7"),
         Path("Scenarios"),
     ]
     for d in possible_dirs:

@@ -7,18 +7,19 @@ RUN apt-get update && apt-get install -y git unzip && rm -rf /var/lib/apt/lists/
 RUN adduser agentbeats
 USER agentbeats
 RUN mkdir -p /home/agentbeats/.cache/uv
-WORKDIR /home/agentbeats/tutorial
+WORKDIR /home/agentbeats/itbench_eval
 
-COPY pyproject.toml uv.lock README.md Scenarios.zip ./
-COPY src src
+COPY pyproject.toml uv.lock README.md Scenarios.zip ./ 
+COPY src/ ./src/
+COPY itbench_evaluations/ ./itbench_evaluations/
+COPY itbench/evaluator/ ./itbench/evaluator/
+COPY itbench/scenario.toml ./itbench/scenario.toml
 
 RUN \
     --mount=type=cache,target=/home/agentbeats/.cache/uv,uid=1000 \
     uv sync --locked --no-dev --no-install-project
 
 RUN unzip -q Scenarios.zip && rm Scenarios.zip
-
-COPY itbench itbench
 
 ENTRYPOINT ["uv", "run", "itbench/evaluator/src/server.py"]
 CMD ["--host", "0.0.0.0"]
