@@ -1,5 +1,5 @@
-## Instructions
-### Run with python
+# Instructions
+## Run with python
 1. Create env.
 ```bash
 uv sync
@@ -35,7 +35,7 @@ uv run agentbeats-run itbench/scenario.toml
 uv run agentbeats-run itbench/scenario.toml --show-logs
 ```
 
-### Run containerized version
+## Run containerized version
 1. Follow step 3 in the python instructions above, then zip up the Scenarios folder. Make sure it is called Scenarios.zip.
 
 2. Build the images.
