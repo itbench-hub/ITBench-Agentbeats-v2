@@ -21,7 +21,7 @@ Scenarios/
 └── Scenario_3/  
 Once you have moved them delete .cache and snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7.
 
-4. Create a .env file with your model access credentials.
+4. Create a .env file with your model access credentials. The evaluator model must be set to Gemini 3 Pro Preview to keep evaluations fair.
 ```bash
 cp sample.env .env
 ```
