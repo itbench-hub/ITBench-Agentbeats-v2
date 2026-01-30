@@ -19,11 +19,24 @@ This project uses litellm to allow models from many different providers to be us
 
 5. Run the evaluation.
 ```bash
+# Run all scenarios
 uv run agentbeats-run itbench/scenario.toml
 
-# with logs
+# Run only SRE scenarios
+uv run agentbeats-run itbench/scenario-sre.toml
+
+# Run only FinOps scenarios
+uv run agentbeats-run itbench/scenario-finops.toml
+
+# With logs
 uv run agentbeats-run itbench/scenario.toml --show-logs
 ```
+
+**Domain Filtering**: You can filter scenarios by domain in the configuration file:
+- `domains = ["all"]` - Run all available scenarios (default)
+- `domains = ["sre"]` - Run only SRE scenarios
+- `domains = ["finops"]` - Run only FinOps scenarios
+- `domains = ["sre", "finops"]` - Run specific domains
 
 ## Run containerized version
 1. Prepare the Scenarios folder using `./itbench/setup.sh` (see step 2 above).
@@ -80,5 +93,12 @@ docker run -d --name itbench-agent \
 
 4. Run the evaluation.
 ```bash
+# Run all scenarios
 uv run python -m agentbeats.client_cli itbench/scenario.toml
+
+# Run only SRE scenarios
+uv run python -m agentbeats.client_cli itbench/scenario-sre.toml
+
+# Run only FinOps scenarios
+uv run python -m agentbeats.client_cli itbench/scenario-finops.toml
 ```

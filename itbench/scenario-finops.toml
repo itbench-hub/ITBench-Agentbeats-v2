@@ -8,10 +8,6 @@ endpoint = "http://127.0.0.1:9019"
 cmd = "python itbench/agent/src/server.py --host 127.0.0.1 --port 9019"
 
 [config]
-# trials: Number of evaluation runs per scenario
-# Default: 1
 trials = 1
-
-# domains: List of domains to evaluate. Options: ["sre", "finops"] or ["all"]
-# Default: ["all"] - evaluates all available domains
-domains = ["all"]
+# Run only FinOps domain scenarios
+domains = ["finops"]

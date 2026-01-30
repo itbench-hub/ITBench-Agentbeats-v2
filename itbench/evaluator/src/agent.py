@@ -58,21 +58,62 @@ class Agent:
         self._load_scenarios()
 
     def _load_scenarios(self):
-        """Load available scenarios from the data directory."""
+        """Load available scenarios from the data directory.
+
+        Scans for scenarios in ITBench-Lite structure:
+        Scenarios/snapshots/{domain}/{version}/Scenario-*/
+        """
         data_dir = Path(__file__).resolve().parents[3] / "Scenarios"
-        
+
         if data_dir.exists() and data_dir.is_dir():
             self.data_dir = data_dir
-            self.scenarios = sorted([
-                d.name for d in data_dir.iterdir() 
-                if d.is_dir() and d.name.startswith("Scenario")
-            ])
+            snapshots_dir = data_dir / "snapshots"
+
+            if snapshots_dir.exists():
+                # Recursively find all Scenario-* directories under snapshots/
+                scenarios = [
+                    str(p.relative_to(data_dir))
+                    for p in snapshots_dir.rglob("Scenario-*")
+                    if p.is_dir()
+                ]
+                self.scenarios = sorted(scenarios)
+            else:
+                self.scenarios = []
+
             if self.scenarios:
                 logger.info(f"Loaded {len(self.scenarios)} scenarios from {data_dir}")
                 return
-        
+
         logger.warning(f"Scenario data directory not found at {data_dir}")
         self.scenarios = []
+
+    def _filter_scenarios_by_domain(self, domains: list[str]) -> list[str]:
+        """Filter scenarios by specified domains.
+
+        Args:
+            domains: List of domains to include (e.g., ["sre", "finops"]) or ["all"]
+
+        Returns:
+            Filtered list of scenario paths
+        """
+        # If "all" is specified, return all scenarios
+        if "all" in domains:
+            return self.scenarios
+
+        # Normalize domain names to lowercase
+        domains_lower = [d.lower() for d in domains]
+
+        # Filter scenarios based on domain
+        filtered = []
+        for scenario in self.scenarios:
+            # Extract domain from path: snapshots/{domain}/{version}/Scenario-*
+            parts = scenario.split('/')
+            if len(parts) >= 2 and parts[0] == "snapshots":
+                scenario_domain = parts[1].lower()
+                if scenario_domain in domains_lower:
+                    filtered.append(scenario)
+
+        return filtered
 
     def _chunk_data(self, data: dict, chunk_size: int = 50000) -> list[dict]:
         """Split large data into smaller chunks to avoid payload size limits.
@@ -545,11 +586,19 @@ class Agent:
     async def _run_full_evaluation(self, request: EvalRequest, updater: TaskUpdater) -> None:
         """Run a full evaluation session with an agent."""
         import time
-        
+
         agent_url = str(request.participants["agent"])
         trials = int(request.config.get("trials", 1))
-        scenarios_to_run = self.scenarios
-        
+
+        # Filter scenarios by domain if specified
+        domains = request.config.get("domains", ["all"])
+        if not isinstance(domains, list):
+            domains = [domains]
+
+        scenarios_to_run = self._filter_scenarios_by_domain(domains)
+
+        if domains != ["all"]:
+            logger.info(f"Filtering scenarios for domains: {domains}")
         logger.info(f"Running {len(scenarios_to_run)} scenarios with {trials} trial(s) each")
         
         await updater.update_status(
