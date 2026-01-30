@@ -35,19 +35,21 @@ uv run agentbeats-run itbench/scenario.toml --show-logs
 ```
 
 ### Run containerized version
-1. Build the images.
+1. Zip up the Scenarios folder, make sure it is called Scenarios.zip.
+
+2. Build the images.
 ```bash
 docker build -f itbench/Dockerfile.evaluator --platform linux/amd64 -t ghcr.io/<your-id>/it-evaluator:v1.0 .
 docker build -f itbench/Dockerfile.agent --platform linux/amd64 -t ghcr.io/<your-id>/it-agent:v1.0 .
 ```
 
-2. Run the images.
+3. Run the images.
 ```bash
 docker run --network=host -p 9009:9009 --env-file .env <evaluator-image-id>
 docker run --network=host -p 9019:9019 --env-file .env <agent-image-id>
 ```
 
-3. Run the evaluation.
+4. Run the evaluation.
 ```bash
 uv run python -m agentbeats.client_cli itbench/scenario.toml
 ```
