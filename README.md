@@ -14,8 +14,7 @@ uv run hf download \
     --local-dir ./Scenarios
 ```
 
-3. Move scenarios from Scenarios/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7 to Scenarios
-The folder structure should be:  
+3. Move scenarios from Scenarios/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7 to Scenarios. The folder structure should be:  
 Scenarios/  
 └── Scenario_1/  
 └── Scenario_2/  
