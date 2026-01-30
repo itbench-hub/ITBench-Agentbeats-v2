@@ -19,8 +19,9 @@ RUN \
     --mount=type=cache,target=/home/agentbeats/.cache/uv,uid=1000 \
     uv sync --locked --no-dev --no-install-project
 
-RUN unzip -q Scenarios.zip && rm Scenarios.zip
+COPY itbench/evaluator_entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
 
-ENTRYPOINT ["uv", "run", "itbench/evaluator/src/server.py"]
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["--host", "0.0.0.0"]
 EXPOSE 9009

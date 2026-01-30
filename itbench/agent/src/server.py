@@ -31,9 +31,9 @@ def main():
     print(f"\n📋 Configuration:")
     print(f"   Host: {args.host}")
     print(f"   Port: {args.port}")
-    print(f"   Model: {os.getenv('MODEL', 'Not set')}")
-    print(f"   Provider: {os.getenv('PROVIDER', 'Not set')}")
-    print(f"   Base URL: {os.getenv('URL', 'Not set')}")
+    print(f"   Model: {os.getenv('AGENT_MODEL', 'Not set')}")
+    print(f"   Provider: {os.getenv('AGENT_PROVIDER', 'Not set')}")
+    print(f"   Base URL: {os.getenv('AGENT_URL', 'Not set')}")
     print()
 
     skill = AgentSkill(
