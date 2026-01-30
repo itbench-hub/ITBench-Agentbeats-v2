@@ -2,24 +2,22 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm
 
 ENV UV_HTTP_TIMEOUT=300
 
-RUN apt-get update && apt-get install -y git unzip && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 RUN adduser agentbeats
 USER agentbeats
 RUN mkdir -p /home/agentbeats/.cache/uv
 WORKDIR /home/agentbeats/itbench_eval
 
-COPY pyproject.toml uv.lock README.md Scenarios.zip ./ 
-COPY src/ ./src/
-COPY itbench_evaluations/ ./itbench_evaluations/
-COPY itbench/evaluator/ ./itbench/evaluator/
-COPY itbench/scenario.toml ./itbench/scenario.toml
+COPY --chown=agentbeats:agentbeats pyproject.toml uv.lock README.md ./
+COPY --chown=agentbeats:agentbeats src/ ./src/
+COPY --chown=agentbeats:agentbeats itbench_evaluations/ ./itbench_evaluations/
+COPY --chown=agentbeats:agentbeats itbench/evaluator/ ./itbench/evaluator/
+COPY --chown=agentbeats:agentbeats itbench/scenario.toml ./itbench/scenario.toml
 
 RUN \
     --mount=type=cache,target=/home/agentbeats/.cache/uv,uid=1000 \
     uv sync --locked --no-dev --no-install-project
-
-RUN unzip -q Scenarios.zip && rm Scenarios.zip
 
 ENTRYPOINT ["uv", "run", "itbench/evaluator/src/server.py"]
 CMD ["--host", "0.0.0.0"]

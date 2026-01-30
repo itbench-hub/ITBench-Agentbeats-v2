@@ -9,11 +9,11 @@ USER agentbeats
 RUN mkdir -p /home/agentbeats/.cache/uv
 WORKDIR /home/agentbeats/itbench_eval
 
-COPY pyproject.toml uv.lock README.md ./
-COPY src/ ./src/
-COPY itbench/agent/ ./itbench/agent/
-COPY itbench/prompts/ ./itbench/prompts/
-COPY itbench/scenario.toml ./itbench/scenario.toml
+COPY --chown=agentbeats:agentbeats pyproject.toml uv.lock README.md ./
+COPY --chown=agentbeats:agentbeats src/ ./src/
+COPY --chown=agentbeats:agentbeats itbench/agent/ ./itbench/agent/
+COPY --chown=agentbeats:agentbeats itbench/prompts/ ./itbench/prompts/
+COPY --chown=agentbeats:agentbeats itbench/scenario.toml ./itbench/scenario.toml
 
 
 RUN \
