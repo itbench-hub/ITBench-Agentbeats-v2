@@ -2,7 +2,7 @@
 ### Run with python
 1. Create env.
 ```bash
-uv synv
+uv sync
 ```
 
 2. Download Scenarios.
