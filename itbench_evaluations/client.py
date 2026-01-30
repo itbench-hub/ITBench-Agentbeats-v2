@@ -9,10 +9,10 @@ load_dotenv()
 class LiteLLMBackend:
     def create(self, **kwargs):
         """Execute completion using LiteLLM with environment variables."""
-        provider = os.environ.get("PROVIDER")
-        model = os.environ.get("MODEL")
-        base_url = os.environ.get("URL")
-        api_key = os.environ.get("API_KEY")
+        provider = os.environ.get("EVALUATOR_PROVIDER")
+        model = os.environ.get("EVALUATOR_MODEL")
+        base_url = os.environ.get("EVALUATOR_URL")
+        api_key = os.environ.get("EVALUATOR_API_KEY")
         
         # Override parameters with environment variables logic from green_agent
         if provider and model:

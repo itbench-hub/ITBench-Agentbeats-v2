@@ -108,10 +108,10 @@ class Agent:
     """SRE Diagnosis Agent using ReAct framework."""
 
     def __init__(self):
-        self.model = os.getenv("MODEL")
-        self.provider = os.getenv("PROVIDER")
-        self.base_url = os.getenv("URL")
-        self.api_key = os.getenv("API_KEY")
+        self.model = os.getenv("AGENT_MODEL")
+        self.provider = os.getenv("AGENT_PROVIDER")
+        self.base_url = os.getenv("AGENT_URL")
+        self.api_key = os.getenv("AGENT_API_KEY")
         self._pending_data_request: Optional[str] = None
         self._state: Optional[AgentState] = None
         self._awaiting_response = False
@@ -202,9 +202,11 @@ class Agent:
                     
                     # Store merged data
                     if self._state:
-                        self._state.collected_data[data_type] = merged_content
-                        logger.info(f"Stored merged {data_type} data: {len(str(merged_content))} chars")
-                        print(f"   ✅ Stored merged data. Total data types collected: {len(self._state.collected_data)}")
+                        # Summarize the data before storing
+                        summary = await self._summarize_data(data_type, merged_content)
+                        self._state.collected_data[data_type] = summary
+                        logger.info(f"Stored merged {data_type} data summary")
+                        print(f"   ✅ Stored data summary. Total data types collected: {len(self._state.collected_data)}")
                         print(f"   Collected types: {list(self._state.collected_data.keys())}")
                     
                     # Continue ReAct loop
@@ -231,9 +233,11 @@ class Agent:
             
             # Non-chunked data - process normally
             if self._state and data_type:
-                self._state.collected_data[data_type] = content
-                logger.info(f"Stored {data_type} data: {len(str(content))} chars")
-                print(f"   ✅ Stored in state. Total data types collected: {len(self._state.collected_data)}")
+                # Summarize the data before storing
+                summary = await self._summarize_data(data_type, content)
+                self._state.collected_data[data_type] = summary
+                logger.info(f"Stored {data_type} data summary")
+                print(f"   ✅ Stored data summary. Total data types collected: {len(self._state.collected_data)}")
                 print(f"   Collected types: {list(self._state.collected_data.keys())}")
             
             # Continue ReAct loop
@@ -444,19 +448,11 @@ class Agent:
             )
 
         # Create alert summary if we have alerts
+        # Create alert summary if we have alerts
         alert_summary = ""
         if "alerts" in state.collected_data:
-            alerts = state.collected_data["alerts"]
-            if isinstance(alerts, dict):
-                all_alerts = []
-                for v in alerts.values():
-                    if isinstance(v, list):
-                        all_alerts.extend(v)
-                alerts = all_alerts
-            
-            if alerts:
-                alert_names = [a.get("labels", {}).get("alertname", "unknown") for a in alerts[:20]]
-                alert_summary = f"\nAlert summary ({len(alerts)} total): {', '.join(set(alert_names))}"
+            # Data is now stored as a summary string
+            alert_summary = f"\nAlert summary: {state.collected_data['alerts']}"
 
         # Load and format prompt
         prompt_template = load_prompt("reason")
@@ -547,6 +543,36 @@ class Agent:
             else:
                 print(f"   → Fallback: Proceeding to diagnose")
                 return "Have enough data, proceeding to diagnose", ActionType.DIAGNOSE, {}
+
+    async def _summarize_data(self, data_type: str, data_content: Any) -> str:
+        """Summarize collected data using LLM."""
+        print(f"\n   📝 Summarizing {data_type} data...")
+        
+        # Convert to string and truncate if necessary
+        data_str = str(data_content)
+        MAX_SUMMARY_INPUT = 50000
+        if len(data_str) > MAX_SUMMARY_INPUT:
+            print(f"      Truncating input from {len(data_str)} to {MAX_SUMMARY_INPUT} chars")
+            data_str = data_str[:MAX_SUMMARY_INPUT] + "\n...[TRUNCATED]..."
+
+        prompt_template = load_prompt("summarize")
+        prompt = prompt_template.format(data_type=data_type, data_content=data_str)
+
+        try:
+            response = completion(
+                base_url=self.base_url,
+                api_key=self.api_key,
+                model=f"{self.provider}/{self.model}" if self.provider else self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000,
+            )
+            summary = response.choices[0].message.content.strip()
+            print(f"      ✅ Summary generated ({len(summary)} chars)")
+            return summary
+        except Exception as e:
+            print(f"      ❌ Summary generation failed: {e}")
+            logger.error(f"Summary generation failed: {e}")
+            return f"Error analyzing {data_type}: {str(e)[:200]}"
 
     async def _diagnose(self, data_str: str) -> dict:
         """Analyze collected data and produce diagnosis."""
