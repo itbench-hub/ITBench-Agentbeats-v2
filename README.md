@@ -34,7 +34,7 @@ uv run agentbeats-run itbench/scenario.toml
 uv run agentbeats-run itbench/scenario.toml --show-logs
 ```
 
-### Run dockerized version
+### Run containerized version
 1. Build the images.
 ```bash
 docker build -f itbench/Dockerfile.evaluator --platform linux/amd64 -t ghcr.io/<your-id>/it-evaluator:v1.0 .
