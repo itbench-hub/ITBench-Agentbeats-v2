@@ -23,7 +23,7 @@ Once you have moved them delete .cache and snapshots/sre/v0.2-B96DF826-4BB2-4B62
 
 4. Create a .env file with your model access credentials. The evaluator model must be set to Gemini 3 Pro Preview to keep evaluations fair.
 ```bash
-cp sample.env .env
+cp .env.tmpl .env
 ```
 This project uses litellm to allow models from many different providers to be used. Documentation for providers can be found here: https://docs.litellm.ai/docs/providers.
 
