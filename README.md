@@ -25,7 +25,7 @@ Once you have moved them delete .cache and snapshots/sre/v0.2-B96DF826-4BB2-4B62
 ```bash
 cp sample.env .env
 ```
-This project uses litellm to allow models from many different providers to be used. Documentation for providers can be found here: https://docs.litellm.ai/docs/providers.
+This project uses the OpenAI Python client. It supports any OpenAI-compatible provider.
 
 5. Run the evaluation.
 ```bash

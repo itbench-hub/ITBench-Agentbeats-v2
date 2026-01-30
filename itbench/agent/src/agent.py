@@ -17,8 +17,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-import litellm
-from litellm import completion
+from openai import OpenAI
 
 from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Message, Part, TaskState
@@ -117,6 +116,11 @@ class Agent:
         self._awaiting_response = False
         # Track chunks for multi-part data responses
         self._chunk_buffer: dict[str, dict] = {}  # data_type -> {chunks: dict, total: int}
+
+        self.client = OpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key,
+        )
 
     async def run(self, message: Message, updater: TaskUpdater) -> None:
         """Process incoming message and return response."""
@@ -472,9 +476,7 @@ class Agent:
             print(f"      Prompt length: {len(prompt)} chars")
             logger.info(f"Sending reason request to LLM...")
             
-            response = completion(
-                base_url=self.base_url,
-                api_key=self.api_key,
+            response = self.client.chat.completions.create(
                 model=f"{self.provider}/{self.model}" if self.provider else self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
@@ -559,9 +561,7 @@ class Agent:
         prompt = prompt_template.format(data_type=data_type, data_content=data_str)
 
         try:
-            response = completion(
-                base_url=self.base_url,
-                api_key=self.api_key,
+            response = self.client.chat.completions.create(
                 model=f"{self.provider}/{self.model}" if self.provider else self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1000,
@@ -615,14 +615,12 @@ class Agent:
                     print(f"      Max tokens: {max_tokens}")
                     logger.info(f"Diagnosis attempt {attempt+1}/3...")
                     
-                    response = completion(
-                        base_url=self.base_url,
-                        api_key=self.api_key,
+                    response = self.client.chat.completions.create(
                         model=f"{self.provider}/{self.model}" if self.provider else self.model,
                         messages=[{"role": "user", "content": prompt}],
                         max_tokens=max_tokens,
                         timeout=120,
-                        num_retries=3,
+                        # num_retries=3, # OpenAI client handles retries differently but default is usually 2
                     )
 
                     content = response.choices[0].message.content
