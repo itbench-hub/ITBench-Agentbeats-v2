@@ -5,21 +5,11 @@
 uv sync
 ```
 
-2. Download Scenarios.
+2. Download and prepare scenarios.
 ```bash
-uv run hf download \
-    ibm-research/ITBench-Lite \
-    --repo-type dataset \
-    --include "snapshots/sre/v0.2-*" \
-    --local-dir ./Scenarios
+./itbench/setup.sh
 ```
-
-3. Move scenarios from Scenarios/snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7 to Scenarios. The folder structure should be:  
-Scenarios/  
-└── Scenario_1/  
-└── Scenario_2/  
-└── Scenario_3/  
-Once you have moved them delete .cache and snapshots/sre/v0.2-B96DF826-4BB2-4B62-97AB-6D84254C53D7.
+This downloads the complete ITBench-Lite dataset to `./Scenarios/`. The structure will include all snapshots (SRE, etc.) with their scenarios.
 
 4. Create a .env file with your model access credentials. The evaluator model must be set to Gemini 3 Pro Preview to keep evaluations fair.
 ```bash
@@ -36,19 +26,57 @@ uv run agentbeats-run itbench/scenario.toml --show-logs
 ```
 
 ## Run containerized version
-1. Follow step 3 in the python instructions above, then zip up the Scenarios folder. Make sure it is called Scenarios.zip.
+1. Prepare the Scenarios folder using `./itbench/setup.sh` (see step 2 above).
 
 2. Build the images.
 ```bash
-docker build -f itbench/Dockerfile.evaluator --platform linux/amd64 -t ghcr.io/<your-id>/it-evaluator:v1.0 .
-docker build -f itbench/Dockerfile.agent --platform linux/amd64 -t ghcr.io/<your-id>/it-agent:v1.0 .
+# Build for local use
+make build
+
+# Or build for specific architecture
+make build PLATFORMS=linux/amd64
+
+# Or build for remote registry
+make build IMG_REGISTRY=ghcr.io IMG_NAMESPACE=<your-id> VERSION=v1.0
 ```
 
-3. Run the images.
+3. Run the containers (works with both Docker and Podman).
+
+**Using Makefile (recommended):**
 ```bash
-docker run --network=host -p 9009:9009 --env-file .env <evaluator-image-id>
-docker run --network=host -p 9019:9019 --env-file .env <agent-image-id>
+# Run both containers
+make run-all
+
+# Or run individually
+make run-evaluator
+make run-agent
+
+# View logs
+make logs-evaluator
+make logs-agent
+
+# Stop containers
+make stop-all
 ```
+
+**Manual commands:**
+```bash
+# Run evaluator with Scenarios mounted (read-only)
+docker run -d --name itbench-evaluator \
+  -p 9009:9009 \
+  --env-file .env \
+  -v $(pwd)/Scenarios:/home/agentbeats/itbench_eval/Scenarios:ro \
+  localhost/itbench/evaluator:latest
+
+# Run agent
+docker run -d --name itbench-agent \
+  -p 9019:9019 \
+  --env-file .env \
+  localhost/itbench/agent:latest
+```
+
+**Note:**
+- Replace `docker` with `podman` if using Podman
 
 4. Run the evaluation.
 ```bash
