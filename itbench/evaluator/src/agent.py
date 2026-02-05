@@ -8,7 +8,9 @@ on request, and runs batch evaluation of agent diagnoses.
 import json
 import logging
 import os
+import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -55,24 +57,96 @@ class Agent:
         self.data_dir: Path | None = None
         self.outputs_dir = Path("outputs")
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
+        # Lightweight directory that stores only ground_truth files for batch evaluation
+        self._ground_truth_dir = Path("ground_truths")
+        self._ground_truth_dir.mkdir(parents=True, exist_ok=True)
         self._load_scenarios()
 
     def _load_scenarios(self):
-        """Load available scenarios from the data directory."""
+        """Load available scenarios from the data directory.
+
+        Scenarios are stored as individual zip files (e.g. Scenario-1.zip)
+        inside the Scenarios directory.  Each zip is only extracted on
+        demand to conserve disk space.
+        """
         data_dir = Path(__file__).resolve().parents[3] / "Scenarios"
-        
+
         if data_dir.exists() and data_dir.is_dir():
             self.data_dir = data_dir
             self.scenarios = sorted([
-                d.name for d in data_dir.iterdir() 
-                if d.is_dir() and d.name.startswith("Scenario")
+                z.stem for z in data_dir.iterdir()
+                if z.is_file() and z.suffix == '.zip' and z.stem.startswith("Scenario")
             ])
             if self.scenarios:
-                logger.info(f"Loaded {len(self.scenarios)} scenarios from {data_dir}")
+                logger.info(f"Found {len(self.scenarios)} scenario zips in {data_dir}")
                 return
-        
+
         logger.warning(f"Scenario data directory not found at {data_dir}")
         self.scenarios = []
+
+    # ------------------------------------------------------------------
+    # Per-scenario zip / cleanup helpers
+    # ------------------------------------------------------------------
+
+    def _unzip_scenario(self, scenario_name: str) -> bool:
+        """Unzip a single scenario zip into its folder.
+
+        Also copies the ground_truth file (if present) into the
+        lightweight ``_ground_truth_dir`` so that batch evaluation can
+        run after all scenario folders have been cleaned up.
+        """
+        if not self.data_dir:
+            return False
+
+        zip_path = self.data_dir / f"{scenario_name}.zip"
+        scenario_path = self.data_dir / scenario_name
+
+        if scenario_path.exists():
+            logger.info(f"Scenario {scenario_name} already unzipped")
+            return True
+
+        if not zip_path.exists():
+            logger.error(f"Zip file not found: {zip_path}")
+            return False
+
+        logger.info(f"Unzipping {zip_path} …")
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(self.data_dir)
+        logger.info(f"Unzipped {scenario_name}")
+
+        # Persist the ground truth file for later batch evaluation
+        self._persist_ground_truth(scenario_name)
+        return True
+
+    def _persist_ground_truth(self, scenario_name: str) -> None:
+        """Copy ground_truth file to the persistent ground truths dir."""
+        if not self.data_dir:
+            return
+        scenario_path = self.data_dir / scenario_name
+        gt_candidates = [
+            scenario_path / "ground_truth.yaml",
+            scenario_path / "ground_truth.yml",
+            scenario_path / "ground_truth.json",
+            scenario_path / "gt.yaml",
+            scenario_path / "gt.json",
+        ]
+        for gt_file in gt_candidates:
+            if gt_file.exists():
+                dest_dir = self._ground_truth_dir / scenario_name
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(gt_file, dest_dir / gt_file.name)
+                logger.info(f"Persisted {gt_file.name} for {scenario_name}")
+                return
+        logger.warning(f"No ground truth file found for {scenario_name}")
+
+    def _cleanup_scenario(self, scenario_name: str) -> None:
+        """Delete the unzipped scenario folder to free disk space."""
+        if not self.data_dir:
+            return
+        scenario_path = self.data_dir / scenario_name
+        if scenario_path.exists() and scenario_path.is_dir():
+            shutil.rmtree(scenario_path)
+            logger.info(f"Cleaned up {scenario_name}")
 
     def _chunk_data(self, data: dict, chunk_size: int = 50000) -> list[dict]:
         """Split large data into smaller chunks to avoid payload size limits.
@@ -360,6 +434,10 @@ class Agent:
             logger.info(f"Received diagnosis for {self.current_scenario_name}")
             
             completed_scenario = self.current_scenario_name
+
+            # Clean up the completed scenario folder to free disk space
+            self._cleanup_scenario(completed_scenario)
+
             self.current_scenario_idx += 1
             next_payload = self._prepare_next_scenario()
             
@@ -391,12 +469,22 @@ class Agent:
             )
 
     def _prepare_next_scenario(self) -> dict:
-        """Prepare the next scenario payload."""
+        """Prepare the next scenario payload.
+
+        Unzips the next scenario's zip file so its data is available.
+        """
         if self.current_scenario_idx >= len(self.scenarios):
             return {"type": "done", "message": "All scenarios complete"}
-        
+
         self.current_scenario_name = self.scenarios[self.current_scenario_idx]
-        
+
+        # Unzip this scenario on demand
+        if not self._unzip_scenario(self.current_scenario_name):
+            return {
+                "type": "error",
+                "message": f"Failed to unzip {self.current_scenario_name}"
+            }
+
         return {
             "type": "scenario",
             "scenario": self.current_scenario_name,
@@ -431,7 +519,7 @@ class Agent:
             
             cmd = [
                 "uv", "run", "python", "-m", "itbench_evaluations",
-                "--ground-truth", str(self.data_dir),
+                "--ground-truth", str(self._ground_truth_dir),
                 "--outputs", str(self.outputs_dir),
                 "--eval-criteria",
                 "ROOT_CAUSE_ENTITY",
@@ -563,7 +651,13 @@ class Agent:
         try:
             for scenario in scenarios_to_run:
                 self.current_scenario_name = scenario
-                
+
+                # Unzip this scenario on demand
+                if not self._unzip_scenario(scenario):
+                    logger.error(f"Failed to unzip {scenario}, skipping")
+                    results["scenarios"][scenario] = {"error": f"Failed to unzip {scenario}"}
+                    continue
+
                 await updater.update_status(
                     TaskState.working,
                     new_agent_text_message(f"Running scenario {scenario}...")
@@ -625,6 +719,9 @@ class Agent:
                 except Exception as e:
                     logger.error(f"Error with scenario {scenario}: {e}")
                     results["scenarios"][scenario] = {"error": str(e)}
+                finally:
+                    # Clean up the unzipped scenario folder to free disk space
+                    self._cleanup_scenario(scenario)
             
             # Run batch evaluation
             eval_result = await self._run_batch_evaluation()
@@ -652,7 +749,6 @@ Report: {report_file or 'N/A'}"""
                     Part(root=DataPart(data={
                         "scenarios_evaluated": len(scenarios_to_run),
                         "time_used": time_used,
-                        "agent_outputs": results,
                         "evaluation_results": eval_data,
                     })),
                 ],
